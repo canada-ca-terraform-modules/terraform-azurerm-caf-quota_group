@@ -86,7 +86,7 @@ run "multiple_skus_same_location_independent" {
         management_group_id = "mg-test"
         quotas = [
           { location = "canadacentral", resource_name = "standarddasv5family", limit = 50 },
-          { location = "canadacentral", resource_name = "standardddv4family",  limit = 100 },
+          { location = "canadacentral", resource_name = "standardddv4family", limit = 100 },
         ]
       }
     }
