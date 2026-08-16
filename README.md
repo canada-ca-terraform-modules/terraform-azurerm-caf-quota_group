@@ -43,4 +43,43 @@ module "quota_group" {
 ```
 
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+|------|---------|
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
+| <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) | ~> 2.0 |
+
+## Providers
+
+| Name | Version |
+|------|---------|
+| <a name="provider_azapi"></a> [azapi](#provider\_azapi) | ~> 2.0 |
+| <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
+
+## Modules
+
+No modules.
+
+## Resources
+
+| Name | Type |
+|------|------|
+| [terraform_data.quota_group](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
+| [terraform_data.quota_group_allocations](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
+| [azapi_resource_action.compute_usages](https://registry.terraform.io/providers/azure/azapi/latest/docs/data-sources/resource_action) | data source |
+
+## Inputs
+
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| <a name="input_quota_group"></a> [quota\_group](#input\_quota\_group) | Map of quota group subscription memberships and their quota allocations.<br/><br/>The top-level key is used as the group\_quota\_name.<br/>`subscription_id` defaults to var.subscription\_id if omitted.<br/><br/>Each entry in `quotas` specifies a location, resource name, and desired limit.<br/>`resource_name` accepts either the display name (e.g. "Standard DASv5 Family vCPUs")<br/>or the internal ID (e.g. "standarddasv5family"). Display names are auto-resolved. | <pre>map(object({<br/>    management_group_id = string<br/>    subscription_id     = optional(string, null)<br/>    quotas = optional(list(object({<br/>      location      = string # Azure region (e.g. "canadacentral")<br/>      resource_name = string # VM SKU family: display name or internal ID<br/>      limit         = number # Desired subscription quota limit (absolute value)<br/>    })), [])<br/>  }))</pre> | `{}` | no |
+| <a name="input_subscription_id"></a> [subscription\_id](#input\_subscription\_id) | The subscription ID to manage quota group memberships for. | `string` | n/a | yes |
+
+## Outputs
+
+| Name | Description |
+|------|-------------|
+| <a name="output_quota_group"></a> [quota\_group](#output\_quota\_group) | The quota group subscription membership resources. |
+| <a name="output_quota_group_allocations"></a> [quota\_group\_allocations](#output\_quota\_group\_allocations) | The quota group allocation resources. |
 <!-- END_TF_DOCS -->
