@@ -60,13 +60,6 @@ locals {
     }
   }
 
-  # Detect any resource names that failed to resolve (still contain spaces).
-  # This catches typos in display names before they hit the API.
-  _unresolved_names = [
-    for k, v in local._resolved_allocations : "${k} -> \"${v.resource_name}\""
-    if can(regex(" ", v.resource_name))
-  ]
-
   # Build the cleanup commands per subscription group key.
   # Each allocation gets its own cleanup entry (reset to limit=10).
   _cleanup_commands_by_subscription = {

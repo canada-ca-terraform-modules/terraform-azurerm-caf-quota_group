@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.9"
+}
+
 module "quota_group" {
   source = "github.com/canada-ca-terraform-modules/terraform-azurerm-caf-quota_group?ref=v1.1.0"
 
