@@ -424,6 +424,8 @@
       background: var(--colorNeutralBackground2);
       cursor: pointer;
       user-select: none;
+      flex-wrap: nowrap;
+      gap: 16px;
     }
     .job-card-header:hover { background: var(--colorNeutralBackground4); }
     .job-card-info {
@@ -431,6 +433,8 @@
       flex-direction: column;
       gap: 2px;
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
       min-width: 0;
     }
     .job-card-title {
@@ -449,11 +453,20 @@
       align-items: center;
       gap: 12px;
       flex-shrink: 0;
+      white-space: nowrap;
     }
     .job-card-progress-text {
       font-size: var(--fontSizeBase200);
       color: var(--colorNeutralForeground2);
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .job-card-eta {
+      font-size: var(--fontSizeBase200);
+      color: var(--colorPaletteBlueForeground1);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      min-width: 120px;
     }
     .job-card-body {
       display: none;
@@ -507,6 +520,45 @@
     .hidden { display: none !important; }
     .text-muted { color: var(--colorNeutralForeground2); }
     .error-text { color: var(--colorPaletteRedForeground1); font-size: var(--fontSizeBase200); }
+
+    /* ─── Throttle indicator ─── */
+    .throttle-banner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--colorPaletteYellowBackground1);
+      border: 1px solid #e5c940;
+      border-radius: var(--borderRadiusMedium);
+      font-size: var(--fontSizeBase200);
+      color: var(--colorPaletteYellowForeground1);
+      font-weight: var(--fontWeightSemibold);
+    }
+    .throttle-banner.active { display: flex; }
+    .throttle-banner svg { flex-shrink: 0; }
+
+    /* ─── Rate stats bar ─── */
+    .rate-stats-bar {
+      display: none;
+      align-items: center;
+      gap: 16px;
+      padding: 6px 12px;
+      background: var(--colorNeutralBackground2);
+      border: 1px solid var(--colorNeutralStroke2);
+      border-radius: var(--borderRadiusMedium);
+      font-size: var(--fontSizeBase200);
+      color: var(--colorNeutralForeground2);
+      font-variant-numeric: tabular-nums;
+      flex-wrap: wrap;
+    }
+    .rate-stats-bar.active { display: flex; }
+    .rate-stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .rate-stat-label { color: var(--colorNeutralForeground3); }
+    .rate-stat-value { font-weight: var(--fontWeightSemibold); color: var(--colorNeutralForeground1); }
   </style>
 </head>
 <body>
@@ -591,7 +643,7 @@
             <input class="grid-search" id="sku-filter" type="text" placeholder="Search SKUs..." />
             <div class="leave-control">
               <label for="leave-input">Leave in sub:</label>
-              <input id="leave-input" type="number" value="0" min="0" />
+              <input id="leave-input" type="number" value="10" min="0" />
             </div>
           </div>
         </div>
@@ -615,9 +667,36 @@
       </div>
 
       <!-- Transfer Queue Section (always visible once jobs exist) -->
+      <div class="throttle-banner" id="throttle-banner">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM7.25 4.5a.75.75 0 0 1 1.5 0v4a.75.75 0 0 1-1.5 0v-4zm.75 7.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5z"/></svg>
+        <span id="throttle-text">API rate-limited — waiting before next request</span>
+      </div>
+      <div class="rate-stats-bar" id="rate-stats-bar">
+        <span style="font-weight:var(--fontWeightSemibold); color:var(--colorNeutralForeground1);">Rate:</span>
+        <span id="rate-stats-content"></span>
+      </div>
       <div class="queue-section" id="queue-section" style="display: none;">
         <div class="queue-header">
           <h2>Transfer Queue <span class="queue-badge" id="queue-badge">0</span></h2>
+          <div class="grid-toolbar">
+            <button class="command-btn" id="pause-btn" onclick="pauseQueue()" title="Pause all running transfers after current SKU finishes">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 3.5A.5.5 0 0 1 6 4v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/></svg>
+              Pause
+            </button>
+            <button class="command-btn" id="resume-btn" onclick="resumeQueue()" style="display:none;" title="Resume paused transfers">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 3.5a.5.5 0 0 1 .767-.424l8 5a.5.5 0 0 1 0 .848l-8 5A.5.5 0 0 1 4 13.5v-10z"/></svg>
+              Resume
+            </button>
+            <div class="command-separator"></div>
+            <button class="command-btn" id="save-btn" onclick="saveQueue()" title="Save queue to disk for later resumption">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2a2 2 0 0 1 2-2h7.586a1 1 0 0 1 .707.293l2.414 2.414a1 1 0 0 1 .293.707V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.414L10.586 2H4zm1 7a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5A.5.5 0 0 1 5 8zm0 2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5A.5.5 0 0 1 5 10z"/></svg>
+              Save
+            </button>
+            <button class="command-btn" id="load-btn" onclick="loadQueue()" title="Load previously saved queue">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.1a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-2.1a.5.5 0 0 1 1 0v2.1a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5v-2.1a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" transform="rotate(180 8 8)"/></svg>
+              Load
+            </button>
+          </div>
         </div>
         <div id="queue-list"></div>
       </div>
@@ -722,6 +801,77 @@
           }
         }
         renderQueue();
+
+        // Restore saved form state or apply defaults
+        const saved = loadFormState();
+        if (saved) {
+          // Restore location and leave amount (always safe)
+          if (saved.location) locationInput.value = saved.location;
+          if (saved.leaveAmount) leaveInput.value = saved.leaveAmount;
+
+          // Restore management group if still valid
+          if (saved.managementGroupId && managementGroups.some(mg => mg.id === saved.managementGroupId)) {
+            mgSelect.value = saved.managementGroupId;
+            // Trigger quota group load
+            qgSelect.innerHTML = '<option value="">Loading...</option>';
+            qgSelect.disabled = true;
+            try {
+              const data = await api(`/api/quota-groups/${saved.managementGroupId}`);
+              quotaGroups = data.quotaGroups;
+              qgSelect.innerHTML = '<option value="">— Select —</option>' +
+                quotaGroups.map(qg =>
+                  `<option value="${qg.name}">${qg.name}</option>`
+                ).join('');
+              qgSelect.disabled = false;
+
+              // Restore quota group if still valid
+              if (saved.quotaGroupName && quotaGroups.some(qg => qg.name === saved.quotaGroupName)) {
+                qgSelect.value = saved.quotaGroupName;
+              }
+            } catch (e) {
+              qgSelect.innerHTML = `<option value="">Error: ${e.message}</option>`;
+            }
+          }
+
+          // Restore subscription if still valid
+          if (saved.subscriptionId && subscriptions.some(s => s.subscriptionId === saved.subscriptionId)) {
+            selectedSubscriptionId = saved.subscriptionId;
+            selectedSubscriptionName = saved.subscriptionName || '';
+            const sub = subscriptions.find(s => s.subscriptionId === saved.subscriptionId);
+            if (sub) {
+              selectedSubscriptionName = sub.displayName;
+              subTrigger.querySelector('.combo-text').textContent = sub.displayName;
+            }
+          }
+        } else {
+          // Apply defaults: select "Tenant Root Group" and "canadacentral" quota group
+          const tenantRoot = managementGroups.find(mg =>
+            mg.displayName === 'Tenant Root Group' || mg.id === 'Tenant Root Group'
+          );
+          if (tenantRoot) {
+            mgSelect.value = tenantRoot.id;
+            qgSelect.innerHTML = '<option value="">Loading...</option>';
+            qgSelect.disabled = true;
+            try {
+              const data = await api(`/api/quota-groups/${tenantRoot.id}`);
+              quotaGroups = data.quotaGroups;
+              qgSelect.innerHTML = '<option value="">— Select —</option>' +
+                quotaGroups.map(qg =>
+                  `<option value="${qg.name}">${qg.name}</option>`
+                ).join('');
+              qgSelect.disabled = false;
+
+              // Auto-select "canadacentral" quota group if available
+              const ccGroup = quotaGroups.find(qg => qg.name.toLowerCase() === 'canadacentral');
+              if (ccGroup) {
+                qgSelect.value = ccGroup.name;
+              }
+            } catch (e) {
+              qgSelect.innerHTML = `<option value="">Error: ${e.message}</option>`;
+            }
+          }
+        }
+
         updateLoadBtn();
       } catch (e) {
         mgSelect.innerHTML = `<option value="">Error: ${e.message}</option>`;
@@ -775,6 +925,7 @@
       subTrigger.querySelector('.combo-text').textContent = sub.displayName;
       subDropdown.classList.add('hidden');
       updateLoadBtn();
+      saveFormState();
 
       // Auto-load quotas on subscription selection
       if (mgSelect.value && qgSelect.value && locationInput.value.trim()) {
@@ -943,18 +1094,7 @@
       transferBtn.textContent = 'Queuing...';
 
       try {
-        // Step 1: Register provider
-        try {
-          await apiPost(`/api/register-quota-provider/${selectedSubscriptionId}`, {});
-        } catch (e) { /* non-blocking */ }
-
-        // Step 2: Ensure subscription in group
-        await apiPost(
-          `/api/ensure-subscription-in-group?management_group_id=${encodeURIComponent(mgSelect.value)}&quota_group_name=${encodeURIComponent(qgSelect.value)}&subscription_id=${encodeURIComponent(selectedSubscriptionId)}`,
-          {}
-        );
-
-        // Step 3: Start transfer (fires in background)
+        // Start transfer (pre-steps are handled by the backend job)
         const { jobId } = await apiPost('/api/transfer', {
           management_group_id: mgSelect.value,
           quota_group_name: qgSelect.value,
@@ -1006,6 +1146,11 @@
     });
 
     // ─── SSE per job ─────────────────────────────────────────────────────────
+    const throttleBanner = document.getElementById('throttle-banner');
+    const throttleText = document.getElementById('throttle-text');
+    const rateStatsBar = document.getElementById('rate-stats-bar');
+    const rateStatsContent = document.getElementById('rate-stats-content');
+
     function connectJobSSE(jobId) {
       if (jobSSEs[jobId]) return;  // already connected
 
@@ -1014,6 +1159,32 @@
 
       es.addEventListener('snapshot', (e) => {
         const data = JSON.parse(e.data);
+
+        // Update throttle banner
+        if (data.throttle && data.throttle.is_throttled) {
+          throttleBanner.classList.add('active');
+          throttleText.textContent = `API rate-limited — waiting ${data.throttle.retry_after}s before retrying`;
+        } else {
+          throttleBanner.classList.remove('active');
+        }
+
+        // Update rate stats bar
+        if (data.rateStats && data.rateStats.buckets) {
+          const buckets = data.rateStats.buckets;
+          const relevantBuckets = Object.values(buckets).filter(b => b.effectiveRpm > 0);
+          if (relevantBuckets.length > 0) {
+            rateStatsBar.classList.add('active');
+            rateStatsContent.innerHTML = relevantBuckets.map(b => {
+              const throttleWarn = b.throttleCount > 0 ? ` <span style="color:var(--colorPaletteRedForeground1)">(${b.throttleCount}×429)</span>` : '';
+              const remainingInfo = b.lastRemaining != null ? ` [${b.lastRemaining} left]` : '';
+              return `<span class="rate-stat"><span class="rate-stat-label">${b.name}:</span> <span class="rate-stat-value">${b.effectiveRpm} req/min</span>${remainingInfo}${throttleWarn}</span>`;
+            }).join('');
+          }
+        }
+
+        // Store job data (without metadata)
+        delete data.throttle;
+        delete data.rateStats;
         jobs[jobId] = data;
         renderQueue();
 
@@ -1021,6 +1192,11 @@
         if (data.state === 'completed') {
           es.close();
           delete jobSSEs[jobId];
+          throttleBanner.classList.remove('active');
+          // Hide rate stats if no more active jobs
+          if (!Object.keys(jobSSEs).length) {
+            rateStatsBar.classList.remove('active');
+          }
         }
       });
 
@@ -1039,11 +1215,29 @@
       }
 
       queueSection.style.display = '';
-      const running = jobList.filter(j => j.state !== 'completed').length;
-      queueBadge.textContent = running > 0 ? running : jobList.length;
+      const running = jobList.filter(j => j.state === 'running').length;
+      const paused = jobList.filter(j => j.state === 'paused').length;
+      const activeCount = running + paused;
+      queueBadge.textContent = activeCount > 0 ? activeCount : jobList.length;
       queueBadge.style.background = running > 0
         ? 'var(--colorBrandBackground)'
-        : 'var(--colorNeutralForeground3)';
+        : paused > 0
+          ? 'var(--colorPaletteYellowForeground1)'
+          : 'var(--colorNeutralForeground3)';
+
+      // Toggle pause/resume buttons
+      const pauseBtn = document.getElementById('pause-btn');
+      const resumeBtn = document.getElementById('resume-btn');
+      if (paused > 0 && running === 0) {
+        pauseBtn.style.display = 'none';
+        resumeBtn.style.display = '';
+      } else if (running > 0 || jobList.some(j => j.state === 'queued')) {
+        pauseBtn.style.display = '';
+        resumeBtn.style.display = 'none';
+      } else {
+        pauseBtn.style.display = 'none';
+        resumeBtn.style.display = 'none';
+      }
 
       // Render jobs newest first
       const sorted = [...jobList].reverse();
@@ -1052,19 +1246,33 @@
         const isExpanded = expandedJobs.has(job.jobId);
         const stateLabel = job.state === 'completed'
           ? (job.failed > 0 ? 'Completed with errors' : 'Completed')
-          : job.state === 'running' ? 'Running' : 'Queued';
+          : job.state === 'running' ? 'Running'
+          : job.state === 'paused' ? 'Paused' : 'Queued';
         const stateClass = job.state === 'completed'
           ? (job.failed > 0 ? 'status-failed' : 'status-succeeded')
-          : job.state === 'running' ? 'status-in_progress' : 'status-pending';
+          : job.state === 'running' ? 'status-in_progress'
+          : job.state === 'paused' ? 'status-pending' : 'status-pending';
+
+        // ETA / elapsed display
+        let timeDisplay = '';
+        if (job.state === 'running' && job.etaSeconds != null) {
+          timeDisplay = `<span class="job-card-eta">${formatEta(job.etaSeconds)}</span>`;
+        } else if (job.state === 'running' && job.avgSkuDuration != null) {
+          timeDisplay = `<span class="job-card-eta">~${formatDuration(job.avgSkuDuration)}/SKU</span>`;
+        } else if (job.state === 'completed' && job.startedAt && job.completedAt) {
+          const elapsed = job.completedAt - job.startedAt;
+          timeDisplay = `<span class="job-card-progress-text">took ${formatDuration(elapsed)}</span>`;
+        }
 
         return `
           <div class="job-card" data-job-id="${job.jobId}">
             <div class="job-card-header" onclick="toggleJob('${job.jobId}')">
               <div class="job-card-info">
                 <div class="job-card-title">${escapeHtml(job.subscriptionName)}</div>
-                <div class="job-card-meta">${escapeHtml(job.quotaGroupName)} · ${escapeHtml(job.location)} · ${job.total} SKU${job.total > 1 ? 's' : ''}</div>
+                <div class="job-card-meta">${escapeHtml(job.quotaGroupName)} · ${escapeHtml(job.location)} · ${job.total} SKU${job.total > 1 ? 's' : ''} · <a href="#" onclick="deleteBySubscription(event, '${job.subscriptionId}', '${escapeHtml(job.subscriptionName)}')" style="color:var(--colorPaletteRedForeground1); text-decoration:none; font-weight:var(--fontWeightSemibold);">Delete all for this sub</a></div>
               </div>
               <div class="job-card-right">
+                ${timeDisplay}
                 <div class="mini-progress">
                   <div class="mini-progress-fill ${job.failed > 0 ? 'has-failures' : ''}" style="width: ${pct}%"></div>
                 </div>
@@ -1073,23 +1281,49 @@
                   ${job.state === 'running' ? '<span class="spinner"></span>' : ''}
                   ${stateLabel}
                 </span>
-                ${job.state === 'completed' ? `<button class="dismiss-btn" onclick="dismissJob(event, '${job.jobId}')" title="Dismiss">✕</button>` : ''}
+                ${job.state === 'completed' || job.state === 'paused' ? `<button class="dismiss-btn" onclick="deleteJob(event, '${job.jobId}')" title="Delete this job">✕</button>` : `<button class="dismiss-btn" onclick="deleteJob(event, '${job.jobId}')" title="Stop and delete this job">✕</button>`}
               </div>
             </div>
             <div class="job-card-body ${isExpanded ? 'expanded' : ''}">
-              ${job.skus.map(sku => `
+              ${(job.preSteps || []).map(step => `
+                <div class="job-sku-row" style="background: var(--colorNeutralBackground2);">
+                  <div>
+                    <div class="sku-name" style="font-style: italic;">${escapeHtml(step.displayName)}</div>
+                    <div class="sku-id">${step.error ? `<span class="error-text">${escapeHtml(step.error)}</span>` : 'Setup step'}</div>
+                  </div>
+                  <div class="transfer-detail">—</div>
+                  <span class="status-badge status-${step.status}">
+                    ${step.status === 'in_progress' ? '<span class="spinner"></span>' : ''}
+                    ${formatStatus(step.status)}
+                  </span>
+                </div>
+              `).join('')}
+              ${job.skus.map(sku => {
+                // Per-SKU duration display
+                let skuTime = '';
+                if (sku.startedAt && sku.completedAt) {
+                  skuTime = ` (${formatDuration(sku.completedAt - sku.startedAt)})`;
+                } else if (sku.status === 'in_progress' && sku.startedAt) {
+                  const elapsed = (Date.now() / 1000) - sku.startedAt;
+                  skuTime = ` (${formatDuration(elapsed)}…)`;
+                }
+                const canDelete = sku.status === 'pending';
+                return `
                 <div class="job-sku-row">
                   <div>
                     <div class="sku-name">${escapeHtml(sku.displayName)}</div>
                     <div class="sku-id">${escapeHtml(sku.resourceName)}${sku.error ? ` — <span class="error-text">${escapeHtml(sku.error)}</span>` : ''}</div>
                   </div>
-                  <div class="transfer-detail">${sku.originalLimit} → ${sku.newLimit}</div>
-                  <span class="status-badge status-${sku.status}">
-                    ${sku.status === 'in_progress' ? '<span class="spinner"></span>' : ''}
-                    ${formatStatus(sku.status)}
-                  </span>
+                  <div class="transfer-detail">${sku.originalLimit} → ${sku.newLimit}${skuTime}</div>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="status-badge status-${sku.status}">
+                      ${sku.status === 'in_progress' ? '<span class="spinner"></span>' : ''}
+                      ${formatStatus(sku.status)}
+                    </span>
+                    ${canDelete ? `<button class="dismiss-btn" onclick="deleteSku(event, '${job.jobId}', '${sku.resourceName}')" title="Remove from queue">✕</button>` : ''}
+                  </div>
                 </div>
-              `).join('')}
+              `}).join('')}
             </div>
           </div>
         `;
@@ -1105,15 +1339,64 @@
       renderQueue();
     }
 
-    async function dismissJob(event, jobId) {
+    async function deleteJob(event, jobId) {
       event.stopPropagation();
+      const job = jobs[jobId];
+      if (job && job.state === 'running') {
+        if (!confirm(`This job is still running. Stop and delete it?`)) return;
+      }
       try {
         await apiDelete(`/api/jobs/${jobId}`);
         delete jobs[jobId];
         expandedJobs.delete(jobId);
+        // Close SSE if connected
+        if (jobSSEs[jobId]) {
+          jobSSEs[jobId].close();
+          delete jobSSEs[jobId];
+        }
         renderQueue();
       } catch (e) {
-        console.warn('Failed to dismiss job:', e);
+        alert(`Failed to delete job: ${e.message}`);
+      }
+    }
+
+    async function deleteBySubscription(event, subscriptionId, subscriptionName) {
+      event.stopPropagation();
+      const jobsForSub = Object.values(jobs).filter(j => j.subscriptionId === subscriptionId);
+      if (!confirm(`Delete all ${jobsForSub.length} job(s) for "${subscriptionName}"?`)) return;
+      try {
+        await apiDelete(`/api/jobs/by-subscription/${encodeURIComponent(subscriptionId)}`);
+        for (const j of jobsForSub) {
+          delete jobs[j.jobId];
+          expandedJobs.delete(j.jobId);
+          if (jobSSEs[j.jobId]) {
+            jobSSEs[j.jobId].close();
+            delete jobSSEs[j.jobId];
+          }
+        }
+        renderQueue();
+      } catch (e) {
+        alert(`Failed to delete jobs: ${e.message}`);
+      }
+    }
+
+    async function deleteSku(event, jobId, resourceName) {
+      event.stopPropagation();
+      try {
+        await apiDelete(`/api/jobs/${jobId}/skus/${encodeURIComponent(resourceName)}`);
+        // Update local state — remove the SKU from the job
+        const job = jobs[jobId];
+        if (job) {
+          job.skus = job.skus.filter(s => !(s.resourceName === resourceName && s.status === 'pending'));
+          job.total = job.skus.length;
+          // If no more pending/in-progress, it's done
+          if (!job.skus.some(s => s.status === 'pending' || s.status === 'in_progress')) {
+            job.state = 'completed';
+          }
+        }
+        renderQueue();
+      } catch (e) {
+        alert(`Failed to remove SKU: ${e.message}`);
       }
     }
 
@@ -1126,11 +1409,126 @@
       }
     }
 
+    function formatEta(seconds) {
+      if (seconds == null || seconds <= 0) return null;
+      seconds = Math.round(seconds);
+      if (seconds < 60) return `~${seconds}s remaining`;
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      if (mins < 60) return secs > 0 ? `~${mins}m ${secs}s remaining` : `~${mins}m remaining`;
+      const hrs = Math.floor(mins / 60);
+      const remainMins = mins % 60;
+      return `~${hrs}h ${remainMins}m remaining`;
+    }
+
+    function formatDuration(seconds) {
+      if (seconds == null || seconds <= 0) return '';
+      seconds = Math.round(seconds);
+      if (seconds < 60) return `${seconds}s`;
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      if (mins < 60) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+      const hrs = Math.floor(mins / 60);
+      const remainMins = mins % 60;
+      return `${hrs}h ${remainMins}m`;
+    }
+
     function escapeHtml(text) {
       const d = document.createElement('div');
       d.textContent = text || '';
       return d.innerHTML;
     }
+
+    // ─── Pause / Resume / Save / Load ──────────────────────────────────────────
+    async function pauseQueue() {
+      try {
+        const result = await apiPost('/api/queue/pause', {});
+        // Immediate UI feedback — mark running jobs as paused locally
+        for (const jobId of Object.keys(jobs)) {
+          if (jobs[jobId].state === 'running') {
+            jobs[jobId].state = 'paused';
+          }
+        }
+        renderQueue();
+        console.log('Paused:', result);
+      } catch (e) {
+        alert(`Failed to pause: ${e.message}`);
+      }
+    }
+
+    async function resumeQueue() {
+      try {
+        const result = await apiPost('/api/queue/resume', {});
+        console.log('Resumed:', result);
+        // Reconnect SSE for any jobs that might have been loaded/paused
+        for (const jobId of Object.keys(jobs)) {
+          if (jobs[jobId].state !== 'completed') {
+            connectJobSSE(jobId);
+          }
+        }
+      } catch (e) {
+        alert(`Failed to resume: ${e.message}`);
+      }
+    }
+
+    async function saveQueue() {
+      try {
+        const result = await apiPost('/api/queue/save', {});
+        alert(`Queue saved: ${result.jobCount} job(s) → ${result.path}`);
+      } catch (e) {
+        alert(`Failed to save: ${e.message}`);
+      }
+    }
+
+    async function loadQueue() {
+      try {
+        const result = await apiPost('/api/queue/load', {});
+        alert(`Loaded ${result.loaded} job(s) from ${result.path}${result.skipped > 0 ? ` (${result.skipped} already active)` : ''}\n\nJobs are paused — click Resume to continue.`);
+        // Refresh job list
+        const jobData = await api('/api/jobs');
+        for (const job of jobData.jobs) {
+          jobs[job.jobId] = job;
+          if (job.state !== 'completed') {
+            connectJobSSE(job.jobId);
+          }
+        }
+        renderQueue();
+      } catch (e) {
+        alert(`Failed to load: ${e.message}`);
+      }
+    }
+
+    // ─── localStorage: persist form inputs ───────────────────────────────────
+    const STORAGE_KEY = 'quota-transfer-form';
+
+    function saveFormState() {
+      const state = {
+        managementGroupId: mgSelect.value,
+        quotaGroupName: qgSelect.value,
+        subscriptionId: selectedSubscriptionId,
+        subscriptionName: selectedSubscriptionName,
+        location: locationInput.value,
+        leaveAmount: leaveInput.value,
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) { /* quota exceeded or private mode */ }
+    }
+
+    function loadFormState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch (e) { return null; }
+    }
+
+    // Save on every change
+    mgSelect.addEventListener('change', saveFormState);
+    qgSelect.addEventListener('change', saveFormState);
+    locationInput.addEventListener('input', saveFormState);
+    leaveInput.addEventListener('input', saveFormState);
+    // Subscription selection is saved in the combo handler below
 
     // ─── Boot ────────────────────────────────────────────────────────────────
     init();

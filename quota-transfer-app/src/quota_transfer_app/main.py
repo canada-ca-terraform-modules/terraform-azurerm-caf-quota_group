@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -12,9 +13,10 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from .az_rest import AzRestError, az_rest
+from .az_rest import AzRestError, az_rest, throttle_state, get_rate_stats, save_rate_state, load_rate_state
 from .transfer import (
     JobState,
+    PreStep,
     SkuTransferResult,
     TransferJob,
     TransferStatus,
@@ -30,6 +32,19 @@ app = FastAPI(title="Azure Quota Transfer", version="0.2.0")
 _jobs: dict[str, TransferJob] = {}
 
 API_VERSION = "2025-03-01"
+
+
+@app.on_event("startup")
+async def on_startup():
+    """Load learned rate limits and any saved queue from previous session."""
+    load_rate_state()
+    await load_queue_internal()
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Persist learned rate limits for next session."""
+    save_rate_state()
 
 
 # ─── Models ───────────────────────────────────────────────────────────────────
@@ -288,7 +303,10 @@ async def list_jobs():
 
 @app.post("/api/transfer")
 async def start_transfer(req: TransferRequest):
-    """Start a batch quota transfer (runs in background)."""
+    """Start a batch quota transfer (runs in background).
+
+    Includes pre-steps: register Microsoft.Quota provider and add subscription to group.
+    """
     job_id = str(uuid.uuid4())
 
     # Build SKU results
@@ -315,6 +333,18 @@ async def start_transfer(req: TransferRequest):
             detail="No SKUs to transfer (leave amount >= current limit for all selected SKUs)",
         )
 
+    # Build pre-steps
+    pre_steps = [
+        PreStep(
+            name="register_provider",
+            display_name="Register Microsoft.Quota provider",
+        ),
+        PreStep(
+            name="add_to_group",
+            display_name=f"Add subscription to quota group '{req.quota_group_name}'",
+        ),
+    ]
+
     job = TransferJob(
         job_id=job_id,
         management_group_id=req.management_group_id,
@@ -324,8 +354,13 @@ async def start_transfer(req: TransferRequest):
         location=req.location,
         leave_amount=req.leave_amount,
         skus=sku_results,
+        pre_steps=pre_steps,
     )
+    job._on_step_complete = _on_job_progress
     _jobs[job_id] = job
+
+    # Auto-save: persist queue immediately when a new job is added
+    asyncio.create_task(save_queue_internal())
 
     # Fire-and-forget: run the transfer in the background
     asyncio.create_task(_run_transfer(job))
@@ -343,6 +378,29 @@ async def _run_transfer(job: TransferJob):
         job.notify_update()
 
 
+# ─── Auto-save on progress ────────────────────────────────────────────────────
+
+_queue_save_scheduled: bool = False
+
+
+def _on_job_progress(job: TransferJob):
+    """Called after every step/SKU completes or fails. Triggers debounced queue save."""
+    global _queue_save_scheduled
+    if _queue_save_scheduled:
+        return
+    _queue_save_scheduled = True
+
+    async def _do_save():
+        global _queue_save_scheduled
+        await save_queue_internal()
+        _queue_save_scheduled = False
+
+    try:
+        asyncio.get_event_loop().create_task(_do_save())
+    except RuntimeError:
+        _queue_save_scheduled = False
+
+
 @app.get("/api/jobs/{job_id}/events")
 async def job_events(job_id: str, request: Request):
     """SSE stream for a specific job's progress. Read-only view of background state."""
@@ -353,9 +411,12 @@ async def job_events(job_id: str, request: Request):
 
     async def event_generator():
         # Always send full current state first
+        snapshot = job.summary()
+        snapshot["throttle"] = dict(throttle_state)
+        snapshot["rateStats"] = get_rate_stats()
         yield {
             "event": "snapshot",
-            "data": json.dumps(job.summary()),
+            "data": json.dumps(snapshot),
         }
 
         # If already done, close immediately
@@ -367,30 +428,211 @@ async def job_events(job_id: str, request: Request):
             if await request.is_disconnected():
                 break
             await job.wait_for_update(timeout=2.0)
+            snapshot = job.summary()
+            snapshot["throttle"] = dict(throttle_state)
+            snapshot["rateStats"] = get_rate_stats()
             yield {
                 "event": "snapshot",
-                "data": json.dumps(job.summary()),
+                "data": json.dumps(snapshot),
             }
 
         # Final snapshot
+        snapshot = job.summary()
+        snapshot["throttle"] = dict(throttle_state)
+        snapshot["rateStats"] = get_rate_stats()
         yield {
             "event": "snapshot",
-            "data": json.dumps(job.summary()),
+            "data": json.dumps(snapshot),
         }
 
     return EventSourceResponse(event_generator())
 
 
 @app.delete("/api/jobs/{job_id}")
-async def dismiss_job(job_id: str):
-    """Remove a completed job from the list."""
+async def delete_job(job_id: str):
+    """Remove a job from the queue. Running jobs are paused first."""
     if job_id not in _jobs:
         raise HTTPException(status_code=404, detail="Job not found")
     job = _jobs[job_id]
-    if job.state != JobState.COMPLETED:
-        raise HTTPException(status_code=409, detail="Cannot dismiss a running job")
+
+    # If running, pause it first (current SKU will finish, then it stops)
+    if job.state == JobState.RUNNING:
+        job.pause()
+
     del _jobs[job_id]
-    return {"status": "dismissed"}
+    asyncio.create_task(save_queue_internal())
+    return {"status": "deleted", "jobId": job_id}
+
+
+@app.delete("/api/jobs/by-subscription/{subscription_id}")
+async def delete_jobs_by_subscription(subscription_id: str):
+    """Remove all jobs for a given subscription. Running jobs are paused first."""
+    deleted = []
+    for job_id in list(_jobs.keys()):
+        job = _jobs[job_id]
+        if job.subscription_id == subscription_id:
+            if job.state == JobState.RUNNING:
+                job.pause()
+            del _jobs[job_id]
+            deleted.append(job_id)
+
+    if deleted:
+        asyncio.create_task(save_queue_internal())
+
+    return {"status": "deleted", "count": len(deleted), "jobIds": deleted}
+
+
+@app.delete("/api/jobs/{job_id}/skus/{resource_name}")
+async def delete_job_sku(job_id: str, resource_name: str):
+    """Remove a pending SKU from a job. Only pending SKUs can be removed."""
+    if job_id not in _jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = _jobs[job_id]
+    original_count = len(job.skus)
+    job.skus = [s for s in job.skus if not (s.resource_name == resource_name and s.status == TransferStatus.PENDING)]
+
+    if len(job.skus) == original_count:
+        raise HTTPException(status_code=404, detail="Pending SKU not found")
+
+    # If no pending/in-progress SKUs left, mark job as completed
+    remaining_active = [s for s in job.skus if s.status in (TransferStatus.PENDING, TransferStatus.IN_PROGRESS)]
+    if not remaining_active and job.state != JobState.COMPLETED:
+        job.state = JobState.COMPLETED
+        job.completed_at = time.time()
+
+    job.notify_update()
+    asyncio.create_task(save_queue_internal())
+    return {"status": "deleted", "resourceName": resource_name, "remainingSkus": len(job.skus)}
+
+
+# ─── Pause / Resume ──────────────────────────────────────────────────────────
+
+SAVE_PATH = Path("/tmp/quota-transfer-queue.json")
+
+
+@app.post("/api/queue/pause")
+async def pause_queue():
+    """Pause all running jobs (takes effect after current SKU finishes). Auto-saves state."""
+    paused_count = 0
+    for job in _jobs.values():
+        if job.state in (JobState.RUNNING, JobState.QUEUED):
+            job.pause()
+            paused_count += 1
+
+    # Auto-save on pause so state is recoverable if app is killed
+    if paused_count > 0:
+        await save_queue_internal()
+        save_rate_state()
+
+    return {"status": "paused", "paused": paused_count}
+
+
+@app.post("/api/queue/resume")
+async def resume_queue():
+    """Resume all paused jobs."""
+    resumed_count = 0
+    for job in _jobs.values():
+        if job.state == JobState.PAUSED:
+            job.resume()
+            resumed_count += 1
+        elif job.state == JobState.QUEUED:
+            # Loaded jobs that were never started — kick them off
+            job.resume()
+            asyncio.create_task(_run_transfer(job))
+            resumed_count += 1
+    return {"status": "resumed", "resumed": resumed_count}
+
+
+@app.post("/api/queue/save")
+async def save_queue():
+    """Save all non-completed jobs to a temp file for later resumption."""
+    result = await save_queue_internal()
+    return result
+
+
+async def save_queue_internal():
+    """Internal: persist queue state to disk."""
+    jobs_to_save = []
+    for job in _jobs.values():
+        jobs_to_save.append(job.to_serializable())
+
+    SAVE_PATH.write_text(json.dumps(jobs_to_save, indent=2))
+    save_rate_state()
+    logger.info("Saved %d jobs to %s", len(jobs_to_save), SAVE_PATH)
+    return {
+        "status": "saved",
+        "path": str(SAVE_PATH),
+        "jobCount": len(jobs_to_save),
+    }
+
+
+@app.post("/api/queue/load")
+async def load_queue():
+    """Load previously saved queue from the temp file.
+
+    Loaded jobs come back in paused state — call /api/queue/resume to continue.
+    """
+    if not SAVE_PATH.exists():
+        raise HTTPException(status_code=404, detail=f"No saved queue found at {SAVE_PATH}")
+
+    result = await load_queue_internal()
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to load queue")
+    return result
+
+
+async def load_queue_internal() -> dict | None:
+    """Internal: load saved queue from disk. Returns None if no save file exists."""
+    if not SAVE_PATH.exists():
+        logger.info("No saved queue at %s — starting fresh", SAVE_PATH)
+        return None
+
+    try:
+        data = json.loads(SAVE_PATH.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Failed to read save file %s: %s", SAVE_PATH, e)
+        return None
+
+    loaded_count = 0
+    skipped_count = 0
+    for job_data in data:
+        job_id = job_data["job_id"]
+        if job_id in _jobs:
+            skipped_count += 1
+            continue  # Don't overwrite active jobs
+
+        job = TransferJob.from_serializable(job_data)
+
+        # If the saved job was already completed, load as-is
+        if job_data.get("state") == "completed":
+            job.state = JobState.COMPLETED
+            job._pause_requested = False
+
+        job._on_step_complete = _on_job_progress
+        _jobs[job_id] = job
+        loaded_count += 1
+
+        # For non-completed jobs, start their background task (paused)
+        if job.state != JobState.COMPLETED:
+            asyncio.create_task(_run_transfer(job))
+
+    logger.info("Loaded %d jobs from %s (skipped %d duplicates)", loaded_count, SAVE_PATH, skipped_count)
+    return {
+        "status": "loaded",
+        "path": str(SAVE_PATH),
+        "loaded": loaded_count,
+        "skipped": skipped_count,
+    }
+
+
+# ─── Rate Limiting Stats ──────────────────────────────────────────────────────
+
+
+@app.get("/api/rate-stats")
+async def rate_stats():
+    """Return current adaptive rate-limiting stats for all endpoint buckets."""
+    return get_rate_stats()
 
 
 # ─── Serve the frontend ───────────────────────────────────────────────────────
