@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quota Transfer — Subscription → Group</title>
+  <style>
+    :root {
+      --colorBrandBackground: #0078d4;
+      --colorBrandBackgroundHover: #106ebe;
+      --colorBrandBackgroundPressed: #005a9e;
+      --colorNeutralBackground1: #ffffff;
+      --colorNeutralBackground2: #fafafa;
+      --colorNeutralBackground3: #f5f5f5;
+      --colorNeutralBackground4: #f0f0f0;
+      --colorNeutralForeground1: #242424;
+      --colorNeutralForeground2: #616161;
+      --colorNeutralForeground3: #9e9e9e;
+      --colorNeutralStroke1: #d1d1d1;
+      --colorNeutralStroke2: #e0e0e0;
+      --colorNeutralStrokeAccessible: #616161;
+      --colorPaletteGreenForeground1: #0e7a0d;
+      --colorPaletteGreenBackground1: #f1faf1;
+      --colorPaletteRedForeground1: #bc2f32;
+      --colorPaletteRedBackground1: #fdf3f4;
+      --colorPaletteBlueForeground1: #0078d4;
+      --colorPaletteBlueBackground1: #ebf3fc;
+      --colorPaletteYellowForeground1: #8a6914;
+      --colorPaletteYellowBackground1: #fef7e0;
+      --colorNeutralShadowAmbient: rgba(0,0,0,0.12);
+      --colorNeutralShadowKey: rgba(0,0,0,0.14);
+      --fontFamilyBase: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", sans-serif;
+      --fontSizeBase200: 12px;
+      --fontSizeBase300: 14px;
+      --fontSizeBase400: 16px;
+      --fontSizeBase500: 20px;
+      --fontSizeBase600: 24px;
+      --fontWeightRegular: 400;
+      --fontWeightSemibold: 600;
+      --borderRadiusMedium: 4px;
+      --shadow4: 0 2px 4px var(--colorNeutralShadowAmbient), 0 0 2px var(--colorNeutralShadowKey);
+      --shadow8: 0 4px 8px var(--colorNeutralShadowAmbient), 0 0 2px var(--colorNeutralShadowKey);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--fontFamilyBase);
+      background: var(--colorNeutralBackground3);
+      color: var(--colorNeutralForeground1);
+      font-size: var(--fontSizeBase300);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── Top Bar (Portal Style) ─── */
+    .topbar {
+      background: #1b1a19;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .topbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #fff;
+      font-size: var(--fontSizeBase300);
+      font-weight: var(--fontWeightSemibold);
+    }
+    .topbar-logo svg { width: 18px; height: 18px; fill: #fff; }
+    .topbar-breadcrumb {
+      color: #a19f9d;
+      font-size: var(--fontSizeBase200);
+    }
+    .topbar-breadcrumb span { color: #fff; }
+
+    /* ─── Blade Container ─── */
+    .blade {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--colorNeutralBackground1);
+      margin: 8px;
+      border-radius: var(--borderRadiusMedium);
+      box-shadow: var(--shadow8);
+      overflow: hidden;
+    }
+
+    /* ─── Blade Header ─── */
+    .blade-header {
+      padding: 16px 24px 12px;
+      border-bottom: 1px solid var(--colorNeutralStroke2);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .blade-header h1 {
+      font-size: var(--fontSizeBase500);
+      font-weight: var(--fontWeightSemibold);
+      color: var(--colorNeutralForeground1);
+    }
+
+    /* ─── Command Bar ─── */
+    .command-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 24px;
+      border-bottom: 1px solid var(--colorNeutralStroke2);
+      background: var(--colorNeutralBackground1);
+    }
+    .command-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      padding: 0 12px;
+      border: none;
+      border-radius: var(--borderRadiusMedium);
+      font-size: var(--fontSizeBase300);
+      font-weight: var(--fontWeightSemibold);
+      font-family: var(--fontFamilyBase);
+      cursor: pointer;
+      background: transparent;
+      color: var(--colorBrandBackground);
+      transition: background 0.1s;
+    }
+    .command-btn:hover { background: var(--colorNeutralBackground3); }
+    .command-btn:disabled { color: var(--colorNeutralForeground3); cursor: not-allowed; }
+    .command-btn:disabled:hover { background: transparent; }
+    .command-btn-primary {
+      background: var(--colorBrandBackground);
+      color: #fff;
+    }
+    .command-btn-primary:hover { background: var(--colorBrandBackgroundHover); }
+    .command-btn-primary:disabled { background: var(--colorNeutralStroke1); color: #fff; }
+    .command-separator { width: 1px; height: 20px; background: var(--colorNeutralStroke2); margin: 0 8px; }
+
+    /* ─── Content Area ─── */
+    .blade-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ─── Form Section ─── */
+    .form-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .field label {
+      font-size: var(--fontSizeBase200);
+      font-weight: var(--fontWeightSemibold);
+      color: var(--colorNeutralForeground1);
+    }
+    .field select,
+    .field input[type="text"],
+    .field input[type="number"] {
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid var(--colorNeutralStrokeAccessible);
+      border-radius: var(--borderRadiusMedium);
+      font-size: var(--fontSizeBase300);
+      font-family: var(--fontFamilyBase);
+      background: var(--colorNeutralBackground1);
+      color: var(--colorNeutralForeground1);
+      outline: none;
+      transition: border-color 0.1s;
+    }
+    .field select:focus,
+    .field input:focus {
+      border-color: var(--colorBrandBackground);
+      border-bottom-width: 2px;
+    }
+    .field select:disabled,
+    .field input:disabled {
+      background: var(--colorNeutralBackground4);
+      color: var(--colorNeutralForeground2);
+      border-color: var(--colorNeutralStroke2);
+    }
+
+    /* ─── Data Grid (Portal-style table) ─── */
+    .grid-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .grid-header h2 {
+      font-size: var(--fontSizeBase400);
+      font-weight: var(--fontWeightSemibold);
+    }
+    .grid-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .grid-search {
+      height: 32px;
+      width: 260px;
+      padding: 0 8px 0 32px;
+      border: 1px solid var(--colorNeutralStrokeAccessible);
+      border-radius: var(--borderRadiusMedium);
+      font-size: var(--fontSizeBase300);
+      font-family: var(--fontFamilyBase);
+      background: var(--colorNeutralBackground1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M11.5 7a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zm-.82 4.74a6 6 0 1 1 1.06-1.06l3.04 3.04a.75.75 0 1 1-1.06 1.06l-3.04-3.04z' fill='%23616161'/%3E%3C/svg%3E") no-repeat 8px center;
+      outline: none;
+    }
+    .grid-search:focus { border-color: var(--colorBrandBackground); }
+
+    .data-grid-wrapper {
+      border: 1px solid var(--colorNeutralStroke2);
+      border-radius: var(--borderRadiusMedium);
+      overflow: hidden;
+    }
+    .data-grid-scroll {
+      max-height: 380px;
+      overflow-y: auto;
+    }
+    .data-grid {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--fontSizeBase300);
+    }
+    .data-grid thead {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .data-grid th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: var(--fontSizeBase200);
+      font-weight: var(--fontWeightSemibold);
+      color: var(--colorNeutralForeground2);
+      background: var(--colorNeutralBackground4);
+      border-bottom: 1px solid var(--colorNeutralStroke1);
+      white-space: nowrap;
+      user-select: none;
+    }
+    .data-grid td {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--colorNeutralStroke2);
+      vertical-align: middle;
+    }
+    .data-grid tbody tr:hover {
+      background: var(--colorNeutralBackground2);
+    }
+    .data-grid .col-check { width: 36px; text-align: center; }
+    .data-grid .col-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .data-grid .sku-id { color: var(--colorNeutralForeground3); font-size: var(--fontSizeBase200); }
+
+    /* ─── Status Badges ─── */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: var(--fontSizeBase200);
+      font-weight: var(--fontWeightSemibold);
+      white-space: nowrap;
+    }
+    .status-pending { background: var(--colorNeutralBackground4); color: var(--colorNeutralForeground2); }
+    .status-in_progress { background: var(--colorPaletteBlueBackground1); color: var(--colorPaletteBlueForeground1); }
+    .status-succeeded { background: var(--colorPaletteGreenBackground1); color: var(--colorPaletteGreenForeground1); }
+    .status-failed { background: var(--colorPaletteRedBackground1); color: var(--colorPaletteRedForeground1); }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--colorBrandBackground);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Leave Amount Input ─── */
+    .leave-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .leave-control label { font-size: var(--fontSizeBase200); font-weight: var(--fontWeightSemibold); white-space: nowrap; }
+    .leave-control input {
+      width: 80px;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid var(--colorNeutralStrokeAccessible);
+      border-radius: var(--borderRadiusMedium);
+      font-size: var(--fontSizeBase300);
+      font-family: var(--fontFamilyBase);
+      text-align: right;
+    }
+    .leave-control input:focus { border-color: var(--colorBrandBackground); outline: none; }
+
+    /* ─── Combo Box (Portal-style searchable dropdown) ─── */
+    .combo-box { position: relative; }
+    .combo-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid var(--colorNeutralStrokeAccessible);
+      border-radius: var(--borderRadiusMedium);
+      background: var(--colorNeutralBackground1);
+      font-size: var(--fontSizeBase300);
+      font-family: var(--fontFamilyBase);
+      color: var(--colorNeutralForeground1);
+      cursor: pointer;
+      text-align: left;
+    }
+    .combo-trigger:hover { border-color: var(--colorNeutralForeground1); }
+    .combo-trigger:focus { border-color: var(--colorBrandBackground); outline: none; border-bottom-width: 2px; }
+    .combo-trigger:disabled { background: var(--colorNeutralBackground4); color: var(--colorNeutralForeground2); cursor: default; }
+    .combo-trigger .combo-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .combo-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      margin-top: 2px;
+      background: var(--colorNeutralBackground1);
+      border: 1px solid var(--colorNeutralStroke1);
+      border-radius: var(--borderRadiusMedium);
+      box-shadow: var(--shadow8);
+    }
+    .combo-search-wrap {
+      padding: 8px;
+      border-bottom: 1px solid var(--colorNeutralStroke2);
+    }
+    .combo-search {
+      width: 100%;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid var(--colorNeutralStrokeAccessible);
+      border-radius: var(--borderRadiusMedium);
+      font-size: var(--fontSizeBase300);
+      font-family: var(--fontFamilyBase);
+      outline: none;
+    }
+    .combo-search:focus { border-color: var(--colorBrandBackground); }
+    .combo-list {
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .combo-item {
+      display: flex;
+      flex-direction: column;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--colorNeutralStroke2);
+    }
+    .combo-item:last-child { border-bottom: none; }
+    .combo-item:hover { background: var(--colorNeutralBackground2); }
+    .combo-item.selected { background: var(--colorPaletteBlueBackground1); }
+    .combo-item .combo-item-name { font-size: var(--fontSizeBase300); color: var(--colorNeutralForeground1); }
+    .combo-item .combo-item-id { font-size: var(--fontSizeBase200); color: var(--colorNeutralForeground3); }
+
+    /* ─── Transfer Queue Panel ─── */
+    .queue-section {
+      border-top: 2px solid var(--colorNeutralStroke1);
+      padding-top: 16px;
+    }
+    .queue-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .queue-header h2 {
+      font-size: var(--fontSizeBase400);
+      font-weight: var(--fontWeightSemibold);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .queue-badge {
+      background: var(--colorBrandBackground);
+      color: #fff;
+      font-size: var(--fontSizeBase200);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-weight: var(--fontWeightSemibold);
+    }
+    .queue-empty {
+      color: var(--colorNeutralForeground3);
+      font-size: var(--fontSizeBase300);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .job-card {
+      border: 1px solid var(--colorNeutralStroke2);
+      border-radius: var(--borderRadiusMedium);
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .job-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: var(--colorNeutralBackground2);
+      cursor: pointer;
+      user-select: none;
+    }
+    .job-card-header:hover { background: var(--colorNeutralBackground4); }
+    .job-card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+    .job-card-title {
+      font-size: var(--fontSizeBase300);
+      font-weight: var(--fontWeightSemibold);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .job-card-meta {
+      font-size: var(--fontSizeBase200);
+      color: var(--colorNeutralForeground2);
+    }
+    .job-card-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .job-card-progress-text {
+      font-size: var(--fontSizeBase200);
+      color: var(--colorNeutralForeground2);
+      font-variant-numeric: tabular-nums;
+    }
+    .job-card-body {
+      display: none;
+      border-top: 1px solid var(--colorNeutralStroke2);
+    }
+    .job-card-body.expanded { display: block; }
+
+    .job-sku-row {
+      display: grid;
+      grid-template-columns: 1fr 100px 90px;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--colorNeutralStroke2);
+    }
+    .job-sku-row:last-child { border-bottom: none; }
+    .job-sku-row .sku-name { font-size: var(--fontSizeBase300); }
+    .job-sku-row .sku-id { font-size: var(--fontSizeBase200); color: var(--colorNeutralForeground3); }
+    .job-sku-row .transfer-detail { font-size: var(--fontSizeBase200); color: var(--colorNeutralForeground2); font-variant-numeric: tabular-nums; text-align: right; }
+
+    .dismiss-btn {
+      background: none;
+      border: none;
+      color: var(--colorNeutralForeground3);
+      cursor: pointer;
+      font-size: var(--fontSizeBase200);
+      padding: 4px 8px;
+      border-radius: var(--borderRadiusMedium);
+    }
+    .dismiss-btn:hover { background: var(--colorNeutralBackground4); color: var(--colorPaletteRedForeground1); }
+
+    /* ─── Mini progress bar ─── */
+    .mini-progress {
+      width: 80px;
+      height: 4px;
+      background: var(--colorNeutralStroke2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .mini-progress-fill {
+      height: 100%;
+      background: var(--colorPaletteGreenForeground1);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+    .mini-progress-fill.has-failures {
+      background: linear-gradient(to right, var(--colorPaletteGreenForeground1), var(--colorPaletteRedForeground1));
+    }
+
+    /* ─── Utility ─── */
+    .hidden { display: none !important; }
+    .text-muted { color: var(--colorNeutralForeground2); }
+    .error-text { color: var(--colorPaletteRedForeground1); font-size: var(--fontSizeBase200); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-logo">
+      <svg viewBox="0 0 18 18"><path d="M9 0L0 4.5v9L9 18l9-4.5v-9L9 0zm0 1.2l7.5 3.75L9 8.7 1.5 4.95 9 1.2zM1 5.7l7.5 3.75v7.35L1 13.05V5.7zm8.5 11.1V9.45L17 5.7v7.35L9.5 16.8z"/></svg>
+      <span>Microsoft Azure</span>
+    </div>
+    <div class="topbar-breadcrumb">
+      Quotas | <span>Quota Transfer</span>
+    </div>
+  </div>
+
+  <!-- Blade -->
+  <div class="blade">
+    <div class="blade-header">
+      <h1>Transfer Quota to Group</h1>
+    </div>
+
+    <!-- Command Bar -->
+    <div class="command-bar">
+      <button class="command-btn" id="load-skus-btn" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm9-3v2.5h2.5a.5.5 0 0 1 0 1H9V11a.5.5 0 0 1-1 0V8.5H5.5a.5.5 0 0 1 0-1H8V5a.5.5 0 0 1 1 0z"/></svg>
+        Load Quotas
+      </button>
+      <div class="command-separator"></div>
+      <button class="command-btn command-btn-primary" id="transfer-btn" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg>
+        Transfer Selected
+      </button>
+      <span id="selected-count" class="text-muted" style="margin-left: 8px;"></span>
+    </div>
+
+    <!-- Content -->
+    <div class="blade-content">
+
+      <!-- Configuration Section -->
+      <div class="form-section">
+        <div class="field">
+          <label for="mg-select">Management Group</label>
+          <select id="mg-select" disabled>
+            <option value="">Loading...</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="qg-select">Quota Group</label>
+          <select id="qg-select" disabled>
+            <option value="">Select management group first</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="location-input">Region</label>
+          <input id="location-input" type="text" value="canadacentral" />
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="field">
+          <label>Subscription</label>
+          <div class="combo-box" id="sub-combo">
+            <button class="combo-trigger" id="sub-trigger" type="button" disabled>
+              <span class="combo-text">Loading...</span>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.15 4.65a.5.5 0 0 1 .7 0L6 7.79l3.15-3.14a.5.5 0 0 1 .7.7l-3.5 3.5a.5.5 0 0 1-.7 0l-3.5-3.5a.5.5 0 0 1 0-.7z"/></svg>
+            </button>
+            <div class="combo-dropdown hidden" id="sub-dropdown">
+              <div class="combo-search-wrap">
+                <input class="combo-search" id="sub-filter" type="text" placeholder="Filter subscriptions... (supports * wildcards)" />
+              </div>
+              <div class="combo-list" id="sub-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SKU Grid Section -->
+      <div id="sku-section" class="hidden">
+        <div class="grid-header">
+          <h2>Compute Quota</h2>
+          <div class="grid-toolbar">
+            <input class="grid-search" id="sku-filter" type="text" placeholder="Search SKUs..." />
+            <div class="leave-control">
+              <label for="leave-input">Leave in sub:</label>
+              <input id="leave-input" type="number" value="0" min="0" />
+            </div>
+          </div>
+        </div>
+
+        <div class="data-grid-wrapper" style="margin-top: 8px;">
+          <div class="data-grid-scroll">
+            <table class="data-grid">
+              <thead>
+                <tr>
+                  <th class="col-check"><input type="checkbox" id="select-all" /></th>
+                  <th>Quota group resources</th>
+                  <th class="col-num">Current usage / limit</th>
+                  <th class="col-num">Group Quota</th>
+                  <th class="col-num">Will Transfer</th>
+                </tr>
+              </thead>
+              <tbody id="sku-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transfer Queue Section (always visible once jobs exist) -->
+      <div class="queue-section" id="queue-section" style="display: none;">
+        <div class="queue-header">
+          <h2>Transfer Queue <span class="queue-badge" id="queue-badge">0</span></h2>
+        </div>
+        <div id="queue-list"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ─── State ───────────────────────────────────────────────────────────────
+    let managementGroups = [];
+    let quotaGroups = [];
+    let subscriptions = [];
+    let computeUsages = [];
+    let groupQuotas = {};
+    let selectedSkus = new Set();
+    let selectedSubscriptionId = '';
+    let selectedSubscriptionName = '';
+
+    // Job tracking
+    let jobs = {};  // jobId -> latest snapshot
+    let jobSSEs = {};  // jobId -> EventSource
+    let expandedJobs = new Set();
+
+    // ─── DOM refs ────────────────────────────────────────────────────────────
+    const mgSelect = document.getElementById('mg-select');
+    const qgSelect = document.getElementById('qg-select');
+    const subFilter = document.getElementById('sub-filter');
+    const subTrigger = document.getElementById('sub-trigger');
+    const subDropdown = document.getElementById('sub-dropdown');
+    const subList = document.getElementById('sub-list');
+    const locationInput = document.getElementById('location-input');
+    const loadSkusBtn = document.getElementById('load-skus-btn');
+    const skuSection = document.getElementById('sku-section');
+    const skuFilter = document.getElementById('sku-filter');
+    const skuTbody = document.getElementById('sku-tbody');
+    const selectAll = document.getElementById('select-all');
+    const leaveInput = document.getElementById('leave-input');
+    const transferBtn = document.getElementById('transfer-btn');
+    const selectedCount = document.getElementById('selected-count');
+    const queueSection = document.getElementById('queue-section');
+    const queueList = document.getElementById('queue-list');
+    const queueBadge = document.getElementById('queue-badge');
+
+    // ─── API helpers ─────────────────────────────────────────────────────────
+    async function api(path) {
+      const resp = await fetch(path);
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || resp.statusText);
+      }
+      return resp.json();
+    }
+
+    async function apiPost(path, body) {
+      const resp = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || resp.statusText);
+      }
+      return resp.json();
+    }
+
+    async function apiDelete(path) {
+      const resp = await fetch(path, { method: 'DELETE' });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || resp.statusText);
+      }
+      return resp.json();
+    }
+
+    // ─── Init ────────────────────────────────────────────────────────────────
+    async function init() {
+      try {
+        const [mgData, subData, jobData] = await Promise.all([
+          api('/api/management-groups'),
+          api('/api/subscriptions'),
+          api('/api/jobs'),
+        ]);
+
+        managementGroups = mgData.managementGroups;
+        subscriptions = subData.subscriptions.filter(s => s.state === 'Enabled');
+
+        mgSelect.innerHTML = '<option value="">— Select —</option>' +
+          managementGroups.map(mg =>
+            `<option value="${mg.id}">${mg.displayName}</option>`
+          ).join('');
+        mgSelect.disabled = false;
+
+        subTrigger.disabled = false;
+        subTrigger.querySelector('.combo-text').textContent = '— Select subscription —';
+
+        // Restore any existing jobs (reconnect SSE for running ones)
+        for (const job of jobData.jobs) {
+          jobs[job.jobId] = job;
+          if (job.state !== 'completed') {
+            connectJobSSE(job.jobId);
+          }
+        }
+        renderQueue();
+        updateLoadBtn();
+      } catch (e) {
+        mgSelect.innerHTML = `<option value="">Error: ${e.message}</option>`;
+      }
+    }
+
+    // ─── Wildcard matching ─────────────────────────────────────────────────
+    function wildcardMatch(text, pattern) {
+      const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+      const re = new RegExp(escaped, 'i');
+      return re.test(text);
+    }
+
+    function renderSubscriptions(filter) {
+      const f = filter.trim();
+      const filtered = subscriptions.filter(s =>
+        !f || wildcardMatch(s.displayName, f) || wildcardMatch(s.subscriptionId, f)
+      );
+      subList.innerHTML = filtered.map(s =>
+        `<div class="combo-item ${s.subscriptionId === selectedSubscriptionId ? 'selected' : ''}" data-id="${s.subscriptionId}">
+          <span class="combo-item-name">${s.displayName}</span>
+          <span class="combo-item-id">${s.subscriptionId}</span>
+        </div>`
+      ).join('');
+    }
+
+    // ─── Subscription Combo Box ──────────────────────────────────────────────
+    subTrigger.addEventListener('click', () => {
+      const isOpen = !subDropdown.classList.contains('hidden');
+      if (isOpen) {
+        subDropdown.classList.add('hidden');
+      } else {
+        subDropdown.classList.remove('hidden');
+        subFilter.value = '';
+        renderSubscriptions('');
+        subFilter.focus();
+      }
+    });
+
+    subFilter.addEventListener('input', () => renderSubscriptions(subFilter.value));
+
+    subList.addEventListener('click', (e) => {
+      const item = e.target.closest('.combo-item');
+      if (!item) return;
+      const id = item.dataset.id;
+      const sub = subscriptions.find(s => s.subscriptionId === id);
+      if (!sub) return;
+
+      selectedSubscriptionId = id;
+      selectedSubscriptionName = sub.displayName;
+      subTrigger.querySelector('.combo-text').textContent = sub.displayName;
+      subDropdown.classList.add('hidden');
+      updateLoadBtn();
+
+      // Auto-load quotas on subscription selection
+      if (mgSelect.value && qgSelect.value && locationInput.value.trim()) {
+        loadSkuData();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#sub-combo')) {
+        subDropdown.classList.add('hidden');
+      }
+    });
+
+    // ─── Events: Selection ───────────────────────────────────────────────────
+    mgSelect.addEventListener('change', async () => {
+      const mgId = mgSelect.value;
+      if (!mgId) {
+        qgSelect.innerHTML = '<option value="">Select management group first</option>';
+        qgSelect.disabled = true;
+        return;
+      }
+
+      qgSelect.innerHTML = '<option value="">Loading...</option>';
+      qgSelect.disabled = true;
+
+      try {
+        const data = await api(`/api/quota-groups/${mgId}`);
+        quotaGroups = data.quotaGroups;
+        qgSelect.innerHTML = '<option value="">— Select —</option>' +
+          quotaGroups.map(qg =>
+            `<option value="${qg.name}">${qg.name}</option>`
+          ).join('');
+        qgSelect.disabled = false;
+      } catch (e) {
+        qgSelect.innerHTML = `<option value="">Error: ${e.message}</option>`;
+      }
+      updateLoadBtn();
+    });
+
+    qgSelect.addEventListener('change', updateLoadBtn);
+    locationInput.addEventListener('input', updateLoadBtn);
+
+    function updateLoadBtn() {
+      loadSkusBtn.disabled = !(
+        mgSelect.value && qgSelect.value && selectedSubscriptionId && locationInput.value.trim()
+      );
+    }
+
+    // ─── Load SKUs ───────────────────────────────────────────────────────────
+    loadSkusBtn.addEventListener('click', loadSkuData);
+
+    async function loadSkuData() {
+      const subId = selectedSubscriptionId;
+      const location = locationInput.value.trim();
+
+      loadSkusBtn.disabled = true;
+      loadSkusBtn.textContent = 'Loading...';
+
+      try {
+        const [usageData, groupData] = await Promise.all([
+          api(`/api/compute-usages/${subId}/${location}`),
+          api(`/api/group-quotas/${mgSelect.value}/${qgSelect.value}/${location}`),
+        ]);
+        computeUsages = usageData.usages;
+        groupQuotas = groupData.groupQuotas;
+        selectedSkus.clear();
+        renderSkuTable('');
+        skuSection.classList.remove('hidden');
+      } catch (e) {
+        alert(`Failed to load quotas: ${e.message}`);
+      } finally {
+        loadSkusBtn.disabled = false;
+        loadSkusBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm9-3v2.5h2.5a.5.5 0 0 1 0 1H9V11a.5.5 0 0 1-1 0V8.5H5.5a.5.5 0 0 1 0-1H8V5a.5.5 0 0 1 1 0z"/></svg> Load Quotas`;
+        updateLoadBtn();
+      }
+    }
+
+    // ─── SKU Table ───────────────────────────────────────────────────────────
+    function renderSkuTable(filter) {
+      const f = filter.trim();
+      const leaveAmt = parseInt(leaveInput.value) || 0;
+      const filtered = computeUsages.filter(u =>
+        u.limit > 0 && (!f || wildcardMatch(u.displayName, f) || wildcardMatch(u.resourceName, f))
+      );
+
+      skuTbody.innerHTML = filtered.map(u => {
+        const transfer = Math.max(0, u.limit - leaveAmt);
+        const checked = selectedSkus.has(u.resourceName) ? 'checked' : '';
+        const gq = groupQuotas[u.resourceName.toLowerCase()];
+        const groupDisplay = gq ? `${gq.groupQuota}` : '—';
+        return `<tr>
+          <td class="col-check"><input type="checkbox" data-sku="${u.resourceName}" ${checked} /></td>
+          <td title="${u.resourceName}">${u.displayName}</td>
+          <td class="col-num">${u.currentUsage} / ${u.limit}</td>
+          <td class="col-num" style="color: ${gq && gq.availableLimit > 0 ? 'var(--colorPaletteGreenForeground1)' : ''}">${groupDisplay}</td>
+          <td class="col-num" style="font-weight: 600;">${transfer > 0 ? transfer : '—'}</td>
+        </tr>`;
+      }).join('');
+
+      updateSelectAllState();
+      updateTransferBtn();
+    }
+
+    skuFilter.addEventListener('input', () => renderSkuTable(skuFilter.value));
+    leaveInput.addEventListener('input', () => renderSkuTable(skuFilter.value));
+
+    skuTbody.addEventListener('change', (e) => {
+      if (e.target.type === 'checkbox') {
+        const sku = e.target.dataset.sku;
+        if (e.target.checked) selectedSkus.add(sku);
+        else selectedSkus.delete(sku);
+        updateSelectAllState();
+        updateTransferBtn();
+      }
+    });
+
+    selectAll.addEventListener('change', () => {
+      const checkboxes = skuTbody.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(cb => {
+        cb.checked = selectAll.checked;
+        if (selectAll.checked) selectedSkus.add(cb.dataset.sku);
+        else selectedSkus.delete(cb.dataset.sku);
+      });
+      updateTransferBtn();
+    });
+
+    function updateSelectAllState() {
+      const checkboxes = skuTbody.querySelectorAll('input[type="checkbox"]');
+      selectAll.checked = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+    }
+
+    function updateTransferBtn() {
+      const leaveAmt = parseInt(leaveInput.value) || 0;
+      let transferable = 0;
+      selectedSkus.forEach(rn => {
+        const u = computeUsages.find(x => x.resourceName === rn);
+        if (u && u.limit > leaveAmt) transferable++;
+      });
+      transferBtn.disabled = transferable === 0;
+      selectedCount.textContent = transferable > 0
+        ? `${transferable} SKU${transferable > 1 ? 's' : ''} selected`
+        : '';
+    }
+
+    // ─── Transfer (Queue a job) ──────────────────────────────────────────────
+    transferBtn.addEventListener('click', async () => {
+      const leaveAmt = parseInt(leaveInput.value) || 0;
+      const skus = [];
+      selectedSkus.forEach(rn => {
+        const u = computeUsages.find(x => x.resourceName === rn);
+        if (u && u.limit > leaveAmt) {
+          skus.push({ resource_name: u.resourceName, display_name: u.displayName, current_limit: u.limit });
+        }
+      });
+      if (skus.length === 0) return;
+
+      const totalTransfer = skus.reduce((sum, s) => sum + (s.current_limit - leaveAmt), 0);
+      if (!confirm(
+        `Transfer quota for ${skus.length} SKU(s) from "${selectedSubscriptionName}"?\n\n` +
+        `Total vCPUs being moved to group: ${totalTransfer}\n` +
+        `Each SKU limit will be set to: ${leaveAmt}\n\n` +
+        `The transfer will run in the background. You can switch subscriptions and queue more.`
+      )) return;
+
+      transferBtn.disabled = true;
+      transferBtn.textContent = 'Queuing...';
+
+      try {
+        // Step 1: Register provider
+        try {
+          await apiPost(`/api/register-quota-provider/${selectedSubscriptionId}`, {});
+        } catch (e) { /* non-blocking */ }
+
+        // Step 2: Ensure subscription in group
+        await apiPost(
+          `/api/ensure-subscription-in-group?management_group_id=${encodeURIComponent(mgSelect.value)}&quota_group_name=${encodeURIComponent(qgSelect.value)}&subscription_id=${encodeURIComponent(selectedSubscriptionId)}`,
+          {}
+        );
+
+        // Step 3: Start transfer (fires in background)
+        const { jobId } = await apiPost('/api/transfer', {
+          management_group_id: mgSelect.value,
+          quota_group_name: qgSelect.value,
+          subscription_id: selectedSubscriptionId,
+          subscription_name: selectedSubscriptionName,
+          location: locationInput.value.trim(),
+          leave_amount: leaveAmt,
+          skus: skus,
+        });
+
+        // Track the job
+        jobs[jobId] = {
+          jobId,
+          subscriptionName: selectedSubscriptionName,
+          subscriptionId: selectedSubscriptionId,
+          location: locationInput.value.trim(),
+          quotaGroupName: qgSelect.value,
+          state: 'running',
+          total: skus.length,
+          succeeded: 0,
+          failed: 0,
+          inProgress: 0,
+          pending: skus.length,
+          skus: skus.map(s => ({
+            resourceName: s.resource_name,
+            displayName: s.display_name,
+            originalLimit: s.current_limit,
+            newLimit: leaveAmt,
+            status: 'pending',
+            error: '',
+          })),
+        };
+
+        // Connect SSE for live updates
+        connectJobSSE(jobId);
+
+        // Clear selection and show queue
+        selectedSkus.clear();
+        renderSkuTable(skuFilter.value);
+        renderQueue();
+
+      } catch (e) {
+        alert(`Failed to start transfer: ${e.message}`);
+      } finally {
+        transferBtn.disabled = false;
+        transferBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg> Transfer Selected`;
+        updateTransferBtn();
+      }
+    });
+
+    // ─── SSE per job ─────────────────────────────────────────────────────────
+    function connectJobSSE(jobId) {
+      if (jobSSEs[jobId]) return;  // already connected
+
+      const es = new EventSource(`/api/jobs/${jobId}/events`);
+      jobSSEs[jobId] = es;
+
+      es.addEventListener('snapshot', (e) => {
+        const data = JSON.parse(e.data);
+        jobs[jobId] = data;
+        renderQueue();
+
+        // If completed, close SSE
+        if (data.state === 'completed') {
+          es.close();
+          delete jobSSEs[jobId];
+        }
+      });
+
+      es.onerror = () => {
+        es.close();
+        delete jobSSEs[jobId];
+      };
+    }
+
+    // ─── Queue rendering ─────────────────────────────────────────────────────
+    function renderQueue() {
+      const jobList = Object.values(jobs);
+      if (jobList.length === 0) {
+        queueSection.style.display = 'none';
+        return;
+      }
+
+      queueSection.style.display = '';
+      const running = jobList.filter(j => j.state !== 'completed').length;
+      queueBadge.textContent = running > 0 ? running : jobList.length;
+      queueBadge.style.background = running > 0
+        ? 'var(--colorBrandBackground)'
+        : 'var(--colorNeutralForeground3)';
+
+      // Render jobs newest first
+      const sorted = [...jobList].reverse();
+      queueList.innerHTML = sorted.map(job => {
+        const pct = job.total > 0 ? Math.round(((job.succeeded + job.failed) / job.total) * 100) : 0;
+        const isExpanded = expandedJobs.has(job.jobId);
+        const stateLabel = job.state === 'completed'
+          ? (job.failed > 0 ? 'Completed with errors' : 'Completed')
+          : job.state === 'running' ? 'Running' : 'Queued';
+        const stateClass = job.state === 'completed'
+          ? (job.failed > 0 ? 'status-failed' : 'status-succeeded')
+          : job.state === 'running' ? 'status-in_progress' : 'status-pending';
+
+        return `
+          <div class="job-card" data-job-id="${job.jobId}">
+            <div class="job-card-header" onclick="toggleJob('${job.jobId}')">
+              <div class="job-card-info">
+                <div class="job-card-title">${escapeHtml(job.subscriptionName)}</div>
+                <div class="job-card-meta">${escapeHtml(job.quotaGroupName)} · ${escapeHtml(job.location)} · ${job.total} SKU${job.total > 1 ? 's' : ''}</div>
+              </div>
+              <div class="job-card-right">
+                <div class="mini-progress">
+                  <div class="mini-progress-fill ${job.failed > 0 ? 'has-failures' : ''}" style="width: ${pct}%"></div>
+                </div>
+                <span class="job-card-progress-text">${job.succeeded + job.failed}/${job.total}</span>
+                <span class="status-badge ${stateClass}">
+                  ${job.state === 'running' ? '<span class="spinner"></span>' : ''}
+                  ${stateLabel}
+                </span>
+                ${job.state === 'completed' ? `<button class="dismiss-btn" onclick="dismissJob(event, '${job.jobId}')" title="Dismiss">✕</button>` : ''}
+              </div>
+            </div>
+            <div class="job-card-body ${isExpanded ? 'expanded' : ''}">
+              ${job.skus.map(sku => `
+                <div class="job-sku-row">
+                  <div>
+                    <div class="sku-name">${escapeHtml(sku.displayName)}</div>
+                    <div class="sku-id">${escapeHtml(sku.resourceName)}${sku.error ? ` — <span class="error-text">${escapeHtml(sku.error)}</span>` : ''}</div>
+                  </div>
+                  <div class="transfer-detail">${sku.originalLimit} → ${sku.newLimit}</div>
+                  <span class="status-badge status-${sku.status}">
+                    ${sku.status === 'in_progress' ? '<span class="spinner"></span>' : ''}
+                    ${formatStatus(sku.status)}
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleJob(jobId) {
+      if (expandedJobs.has(jobId)) {
+        expandedJobs.delete(jobId);
+      } else {
+        expandedJobs.add(jobId);
+      }
+      renderQueue();
+    }
+
+    async function dismissJob(event, jobId) {
+      event.stopPropagation();
+      try {
+        await apiDelete(`/api/jobs/${jobId}`);
+        delete jobs[jobId];
+        expandedJobs.delete(jobId);
+        renderQueue();
+      } catch (e) {
+        console.warn('Failed to dismiss job:', e);
+      }
+    }
+
+    function formatStatus(status) {
+      switch (status) {
+        case 'in_progress': return 'In progress';
+        case 'succeeded': return 'Succeeded';
+        case 'failed': return 'Failed';
+        default: return 'Pending';
+      }
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div');
+      d.textContent = text || '';
+      return d.innerHTML;
+    }
+
+    // ─── Boot ────────────────────────────────────────────────────────────────
+    init();
+  </script>
+</body>
+</html>

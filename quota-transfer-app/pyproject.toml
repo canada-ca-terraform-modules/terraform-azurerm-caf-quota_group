@@ -1,0 +1,17 @@
+[project]
+name = "quota-transfer-app"
+version = "0.1.0"
+description = "Localhost web app to transfer Azure compute quota from subscriptions to quota groups"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "sse-starlette==2.2.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quota_transfer_app"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
