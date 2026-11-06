@@ -3,11 +3,13 @@
 # Usage: allocate-quota.sh <url> <body_json>
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/quota-registration.sh"
+
 URL="$1"
 BODY="$2"
 
 echo "Submitting quota allocation request..."
-az rest --method patch --url "$URL" --body "$BODY" 2>/dev/null
+az_rest_with_registration_retry "$URL" --method patch --body "$BODY"
 
 RESOURCE_NAME=$(echo "$BODY" | jq -r '.properties.value[0].properties.resourceName')
 EXPECTED_LIMIT=$(echo "$BODY" | jq -r '.properties.value[0].properties.limit')

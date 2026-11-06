@@ -42,6 +42,31 @@ module "quota_group" {
 }
 ```
 
+### Resource provider registration ordering
+
+When registering resource providers in the same apply, order this module after
+the caller's registration resources:
+
+```hcl
+module "quota_group" {
+  # ... source and inputs as above ...
+  depends_on = [module.resource_provider_registration]
+}
+```
+
+This also orders the module's `compute_usages` data source after registration
+(including `Microsoft.Compute`). Register `Microsoft.Quota` on every subscription
+used by the module, including per-group subscription overrides.
+
+Membership and allocation writes handle the registration race by checking
+`Microsoft.Quota` registration state when Azure returns the registration-related
+`BadRequest`. If registration is pending, they poll every 15 seconds for up to
+5 minutes, then retry the write once registration completes. The module does not
+register providers itself. A timeout reports the subscription and registration
+state; unrelated failures are not retried. If the provider is already registered,
+the original error is reported immediately so genuine quota write permission
+problems are not hidden.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
