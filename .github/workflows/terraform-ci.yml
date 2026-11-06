@@ -34,6 +34,9 @@ jobs:
       - name: Terraform Test
         run: terraform test
 
+      - name: Quota Registration Script Tests
+        run: bash tests/quota-registration.sh
+
       - name: TFLint Init
         run: tflint --init
 
